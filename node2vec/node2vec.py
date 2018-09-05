@@ -160,12 +160,13 @@ class Node2Vec:
                 current_neighbors = self.graph[current_node]
                 # Calculate unnormalized weights
                 for destination in current_neighbors:
+                    raw_weight = current_neighbors[destination].get(self.weight_key, 1)
                     if destination == source:  # Backwards probability
-                        ss_weight = current_neighbors[destination].get(self.weight_key, 1) * 1 / p
+                        ss_weight = raw_weight / p
                     elif destination in source_neighbors_set:  # If the neighbor is connected to the source
-                        ss_weight = current_neighbors[destination].get(self.weight_key, 1)
+                        ss_weight = raw_weight
                     else:
-                        ss_weight = current_neighbors[destination].get(self.weight_key, 1) * 1 / q
+                        ss_weight = raw_weight / q
 
                     # Assign the unnormalized sampling strategy weight, normalize during random walk
                     unnormalized_weights.append(ss_weight)
