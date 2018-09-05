@@ -69,6 +69,65 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
 
     return walks
 
+def parallel_precompute_probabilities(nodes, graph, sampling_strategy, global_p, global_q, cpu_num, weight_key, p_key, q_key):
+    """
+    Computes the transition probabilities for the random walks.
+    :return: A pair of dictionaries: probabilities and neighbors.
+    """
+
+    # This maps id and (id, id) to an array of probabilities, where a
+    # single id is set of first-travel probabilities (i.e. the transition
+    # frequency when that id is the first in a walk), and a pair is
+    # (source, current), i.e. the probabilities to use when an in-progress
+    # walk is of the form [..., source, current].
+    probabilities = {}
+    neighbors = {}
+
+    for source in tqdm(nodes, desc='Computing transition probabilities (CPU: %d)' % cpu_num):
+        source_neighbors = graph[source]
+        source_neighbors_set = set(source_neighbors)
+
+        # Save the neighbors
+        neighbors[source] = list(source_neighbors)
+
+        first_travel_weights = list()
+
+        for current_node in source_neighbors:
+            try:
+                sampling_strategy = sampling_strategy[current_node]
+            except KeyError:
+                p = global_p
+                q = global_q
+            else:
+                p = sampling_strategy.get(P_KEY, global_p)
+                q = sampling_strategy.get(Q_KEY, global_q)
+
+            current_weight = source_neighbors[current_node].get(weight_key, 1)
+            first_travel_weights.append(current_weight)
+
+            unnormalized_weights = list()
+
+            current_neighbors = graph[current_node]
+            # Calculate unnormalized weights
+            for destination in current_neighbors:
+                raw_weight = current_neighbors[destination].get(weight_key, 1)
+                if destination == source:  # Backwards probability
+                    ss_weight = raw_weight / p
+                elif destination in source_neighbors_set:  # If the neighbor is connected to the source
+                    ss_weight = raw_weight
+                else:
+                    ss_weight = raw_weight / q
+
+                # Assign the unnormalized sampling strategy weight, normalize during random walk
+                unnormalized_weights.append(ss_weight)
+
+            # Normalize
+            unnormalized_weights = np.array(unnormalized_weights)
+            probabilities[(source, current_node)] = unnormalized_weights / unnormalized_weights.sum()
+
+        unnormalized_weights = np.array(first_travel_weights)
+        probabilities[source] = unnormalized_weights / unnormalized_weights.sum()
+    return probabilities, neighbors
 
 class Node2Vec:
     WEIGHT_KEY = 'weight'
@@ -121,58 +180,11 @@ class Node2Vec:
         """
         Precomputes transition probabilities for each node.
         """
-        # This maps id and (id, id) to an array of probabilities, where a
-        # single id is set of first-travel probabilities (i.e. the transition
-        # frequency when that id is the first in a walk), and a pair is
-        # (source, current), i.e. the probabilities to use when an in-progress
-        # walk is of the form [..., source, current].
-        probabilities = {}
-        neighbors = {}
 
-        for source in tqdm(self.graph.nodes(), desc='Computing transition probabilities'):
-            source_neighbors = self.graph[source]
-            source_neighbors_set = set(source_neighbors)
-
-            # Save the neighbors
-            neighbors[source] = list(source_neighbors)
-
-            first_travel_weights = list()
-
-            for current_node in source_neighbors:
-                try:
-                    sampling_strategy = self.sampling_strategy[current_node]
-                except KeyError:
-                    p = self.p
-                    q = self.q
-                else:
-                    p = sampling_strategy.get(self.P_KEY, self.p)
-                    q = sampling_strategy.get(self.Q_KEY, self.q)
-
-                current_weight = source_neighbors[current_node].get(self.weight_key, 1)
-                first_travel_weights.append(current_weight)
-
-                unnormalized_weights = list()
-
-                current_neighbors = self.graph[current_node]
-                # Calculate unnormalized weights
-                for destination in current_neighbors:
-                    raw_weight = current_neighbors[destination].get(self.weight_key, 1)
-                    if destination == source:  # Backwards probability
-                        ss_weight = raw_weight / p
-                    elif destination in source_neighbors_set:  # If the neighbor is connected to the source
-                        ss_weight = raw_weight
-                    else:
-                        ss_weight = raw_weight / q
-
-                    # Assign the unnormalized sampling strategy weight, normalize during random walk
-                    unnormalized_weights.append(ss_weight)
-
-                # Normalize
-                unnormalized_weights = np.array(unnormalized_weights)
-                probabilities[(source, current_node)] = unnormalized_weights / unnormalized_weights.sum()
-
-            unnormalized_weights = np.array(first_travel_weights)
-            probabilities[source] = unnormalized_weights / unnormalized_weights.sum()
+        probabilities, neighbors = parallel_precompute_probabilities(self.graph.nodes, self.graph,
+                                                                     self.sampling_strategy, self.p, self.q,
+                                                                     0,
+                                                                     self.WEIGHT_KEY, self.P_KEY, self.Q_KEY)
 
         return probabilities, neighbors
 
