@@ -14,13 +14,10 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
     """
 
     walks = list()
-    with tqdm(total=num_walks) as pbar:
+    with tqdm(total=num_walks * len(neighbors)) as pbar:
         pbar.set_description('Generating walks (CPU: {})'.format(cpu_num))
 
         for n_walk in range(num_walks):
-
-            # Update progress bar
-            pbar.update(1)
 
             # Shuffle the nodes
             shuffled_nodes = list(neighbors.keys())
@@ -28,6 +25,7 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
 
             # Start a random walk from every node
             for source in shuffled_nodes:
+                pbar.update(1)
 
                 # Skip nodes with specific num_walks
                 if source in sampling_strategy and \
