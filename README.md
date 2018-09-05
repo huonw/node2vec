@@ -59,3 +59,5 @@ model.save(EMBEDDING_MODEL_FILENAME)
 
 ## Contributing
 I will probably not be maintaining this package actively, if someone wants to contribute and maintain, please contact me.
+
+Run tests with `pytest`.
