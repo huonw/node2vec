@@ -6,9 +6,8 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 
-def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sampling_strategy=None,
-                            num_walks_key=None, walk_length_key=None, neighbors_key=None, probabilities_key=None,
-                            first_travel_key=None):
+def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_walks, cpu_num, sampling_strategy=None,
+                            num_walks_key=None, walk_length_key=None):
     """
     Generates the random walks which will be used as the skip-gram input.
     :return: List of walks. Each walk is a list of nodes.
@@ -24,7 +23,7 @@ def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sam
             pbar.update(1)
 
             # Shuffle the nodes
-            shuffled_nodes = list(d_graph.keys())
+            shuffled_nodes = list(neighbors.keys())
             random.shuffle(shuffled_nodes)
 
             # Start a random walk from every node
@@ -47,19 +46,20 @@ def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sam
 
                 # Perform walk
                 while len(walk) < walk_length:
+                    previous = walk[-1]
 
-                    walk_options = d_graph[walk[-1]].get(neighbors_key, None)
+                    walk_options = neighbors[previous]
 
                     # Skip dead end nodes
                     if not walk_options:
                         break
 
                     if len(walk) == 1:  # For the first step
-                        probabilities = d_graph[walk[-1]][first_travel_key]
-                        walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
+                        p = probabilities[previous]
+                        walk_to = np.random.choice(walk_options, size=1, p=p)[0]
                     else:
-                        probabilities = d_graph[walk[-1]][probabilities_key][walk[-2]]
-                        walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
+                        p = probabilities[(walk[-2], previous)]
+                        walk_to = np.random.choice(walk_options, size=1, p=p)[0]
 
                     walk.append(walk_to)
 
@@ -71,9 +71,6 @@ def parallel_generate_walks(d_graph, global_walk_length, num_walks, cpu_num, sam
 
 
 class Node2Vec:
-    FIRST_TRAVEL_KEY = 'first_travel_key'
-    PROBABILITIES_KEY = 'probabilities'
-    NEIGHBORS_KEY = 'neighbors'
     WEIGHT_KEY = 'weight'
     NUM_WALKS_KEY = 'num_walks'
     WALK_LENGTH_KEY = 'walk_length'
@@ -117,32 +114,31 @@ class Node2Vec:
         else:
             self.sampling_strategy = sampling_strategy
 
-        self.d_graph = self._precompute_probabilities()
+        self.probabilities, self.neighbors = self._precompute_probabilities()
         self.walks = self._generate_walks()
 
     def _precompute_probabilities(self):
         """
         Precomputes transition probabilities for each node.
         """
-        d_graph = defaultdict(dict)
+        # This maps id and (id, id) to an array of probabilities, where a
+        # single id is set of first-travel probabilities (i.e. the transition
+        # frequency when that id is the first in a walk), and a pair is
+        # (source, current), i.e. the probabilities to use when an in-progress
+        # walk is of the form [..., source, current].
+        probabilities = {}
+        neighbors = {}
 
         for source in tqdm(self.graph.nodes(), desc='Computing transition probabilities'):
             source_neighbors = self.graph[source]
             source_neighbors_set = set(source_neighbors)
 
-            # Init probabilities dict for first travel
-            if self.PROBABILITIES_KEY not in d_graph[source]:
-                d_graph[source][self.PROBABILITIES_KEY] = dict()
             # Save the neighbors
-            d_graph[source][self.NEIGHBORS_KEY] = list(source_neighbors)
+            neighbors[source] = list(source_neighbors)
 
             first_travel_weights = list()
 
             for current_node in source_neighbors:
-                # Init probabilities dict
-                if self.PROBABILITIES_KEY not in d_graph[current_node]:
-                    d_graph[current_node][self.PROBABILITIES_KEY] = dict()
-
                 try:
                     sampling_strategy = self.sampling_strategy[current_node]
                 except KeyError:
@@ -173,13 +169,12 @@ class Node2Vec:
 
                 # Normalize
                 unnormalized_weights = np.array(unnormalized_weights)
-                d_graph[current_node][self.PROBABILITIES_KEY][
-                    source] = unnormalized_weights / unnormalized_weights.sum()
+                probabilities[(source, current_node)] = unnormalized_weights / unnormalized_weights.sum()
 
             unnormalized_weights = np.array(first_travel_weights)
-            d_graph[source][self.FIRST_TRAVEL_KEY] = unnormalized_weights / unnormalized_weights.sum()
+            probabilities[source] = unnormalized_weights / unnormalized_weights.sum()
 
-        return d_graph
+        return probabilities, neighbors
 
     def _generate_walks(self):
         """
@@ -192,16 +187,14 @@ class Node2Vec:
         # Split num_walks for each worker
         num_walks_lists = np.array_split(range(self.num_walks), self.workers)
 
-        walk_results = Parallel(n_jobs=self.workers)(delayed(parallel_generate_walks)(self.d_graph,
+        walk_results = Parallel(n_jobs=self.workers)(delayed(parallel_generate_walks)(self.probabilities,
+                                                                                      self.neighbors,
                                                                                       self.walk_length,
                                                                                       len(num_walks),
                                                                                       idx,
                                                                                       self.sampling_strategy,
                                                                                       self.NUM_WALKS_KEY,
-                                                                                      self.WALK_LENGTH_KEY,
-                                                                                      self.NEIGHBORS_KEY,
-                                                                                      self.PROBABILITIES_KEY,
-                                                                                      self.FIRST_TRAVEL_KEY) for
+                                                                                      self.WALK_LENGTH_KEY) for
                                                      idx, num_walks
                                                      in enumerate(num_walks_lists, 1))
 
