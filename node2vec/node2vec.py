@@ -134,6 +134,8 @@ class Node2Vec:
             # Init probabilities dict for first travel
             if self.PROBABILITIES_KEY not in d_graph[source]:
                 d_graph[source][self.PROBABILITIES_KEY] = dict()
+            # Save the neighbors
+            d_graph[source][self.NEIGHBORS_KEY] = source_neighbors
 
             for current_node in source_neighbors:
 
@@ -152,7 +154,6 @@ class Node2Vec:
 
                 unnormalized_weights = list()
                 first_travel_weights = list()
-                d_neighbors = list()
 
                 current_neighbors = self.graph[current_node]
                 # Calculate unnormalized weights
@@ -168,7 +169,6 @@ class Node2Vec:
                     unnormalized_weights.append(ss_weight)
                     if current_node not in first_travel_done:
                         first_travel_weights.append(self.graph[current_node][destination].get(self.weight_key, 1))
-                    d_neighbors.append(destination)
 
                 # Normalize
                 unnormalized_weights = np.array(unnormalized_weights)
@@ -179,9 +179,6 @@ class Node2Vec:
                     unnormalized_weights = np.array(first_travel_weights)
                     d_graph[current_node][self.FIRST_TRAVEL_KEY] = unnormalized_weights / unnormalized_weights.sum()
                     first_travel_done.add(current_node)
-
-                # Save neighbors
-                d_graph[current_node][self.NEIGHBORS_KEY] = d_neighbors
 
         return d_graph
 
