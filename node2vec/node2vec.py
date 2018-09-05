@@ -139,18 +139,21 @@ class Node2Vec:
                 if self.PROBABILITIES_KEY not in d_graph[current_node]:
                     d_graph[current_node][self.PROBABILITIES_KEY] = dict()
 
+                try:
+                    sampling_strategy = self.sampling_strategy[current_node]
+                except KeyError:
+                    p = self.p
+                    q = self.q
+                else:
+                    p = sampling_strategy.get(self.P_KEY, self.p)
+                    q = sampling_strategy.get(self.Q_KEY, self.q)
+
                 unnormalized_weights = list()
                 first_travel_weights = list()
                 d_neighbors = list()
 
                 # Calculate unnormalized weights
                 for destination in self.graph.neighbors(current_node):
-
-                    p = self.sampling_strategy[current_node].get(self.P_KEY,
-                                                                 self.p) if current_node in self.sampling_strategy else self.p
-                    q = self.sampling_strategy[current_node].get(self.Q_KEY,
-                                                                 self.q) if current_node in self.sampling_strategy else self.q
-
                     if destination == source:  # Backwards probability
                         ss_weight = self.graph[current_node][destination].get(self.weight_key, 1) * 1 / p
                     elif destination in self.graph[source]:  # If the neighbor is connected to the source
