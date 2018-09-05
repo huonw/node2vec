@@ -181,10 +181,19 @@ class Node2Vec:
         Precomputes transition probabilities for each node.
         """
 
-        probabilities, neighbors = parallel_precompute_probabilities(self.graph.nodes, self.graph,
-                                                                     self.sampling_strategy, self.p, self.q,
-                                                                     0,
-                                                                     self.WEIGHT_KEY, self.P_KEY, self.Q_KEY)
+        node_lists = np.array_split(list(self.graph.nodes), self.workers)
+
+        results = Parallel(n_jobs=self.workers)(delayed(parallel_precompute_probabilities)(nodes, self.graph,
+                                                                                           self.sampling_strategy, self.p, self.q,
+                                                                                           idx,
+                                                                                           self.WEIGHT_KEY, self.P_KEY, self.Q_KEY)
+                                                for idx, nodes in enumerate(node_lists, 1))
+
+        probabilities = {}
+        neighbors = {}
+        for p, n in results:
+            probabilities.update(p)
+            neighbors.update(n)
 
         return probabilities, neighbors
 
