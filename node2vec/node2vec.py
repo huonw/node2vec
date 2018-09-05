@@ -125,20 +125,20 @@ class Node2Vec:
         Precomputes transition probabilities for each node.
         """
         d_graph = defaultdict(dict)
-        first_travel_done = set()
 
         for source in tqdm(self.graph.nodes(), desc='Computing transition probabilities'):
-            source_neighbors = list(self.graph[source])
+            source_neighbors = self.graph[source]
             source_neighbors_set = set(source_neighbors)
 
             # Init probabilities dict for first travel
             if self.PROBABILITIES_KEY not in d_graph[source]:
                 d_graph[source][self.PROBABILITIES_KEY] = dict()
             # Save the neighbors
-            d_graph[source][self.NEIGHBORS_KEY] = source_neighbors
+            d_graph[source][self.NEIGHBORS_KEY] = list(source_neighbors)
+
+            first_travel_weights = list()
 
             for current_node in source_neighbors:
-
                 # Init probabilities dict
                 if self.PROBABILITIES_KEY not in d_graph[current_node]:
                     d_graph[current_node][self.PROBABILITIES_KEY] = dict()
@@ -152,8 +152,10 @@ class Node2Vec:
                     p = sampling_strategy.get(self.P_KEY, self.p)
                     q = sampling_strategy.get(self.Q_KEY, self.q)
 
+                current_weight = source_neighbors[current_node].get(self.weight_key, 1)
+                first_travel_weights.append(current_weight)
+
                 unnormalized_weights = list()
-                first_travel_weights = list()
 
                 current_neighbors = self.graph[current_node]
                 # Calculate unnormalized weights
@@ -167,18 +169,14 @@ class Node2Vec:
 
                     # Assign the unnormalized sampling strategy weight, normalize during random walk
                     unnormalized_weights.append(ss_weight)
-                    if current_node not in first_travel_done:
-                        first_travel_weights.append(self.graph[current_node][destination].get(self.weight_key, 1))
 
                 # Normalize
                 unnormalized_weights = np.array(unnormalized_weights)
                 d_graph[current_node][self.PROBABILITIES_KEY][
                     source] = unnormalized_weights / unnormalized_weights.sum()
 
-                if current_node not in first_travel_done:
-                    unnormalized_weights = np.array(first_travel_weights)
-                    d_graph[current_node][self.FIRST_TRAVEL_KEY] = unnormalized_weights / unnormalized_weights.sum()
-                    first_travel_done.add(current_node)
+            unnormalized_weights = np.array(first_travel_weights)
+            d_graph[source][self.FIRST_TRAVEL_KEY] = unnormalized_weights / unnormalized_weights.sum()
 
         return d_graph
 
