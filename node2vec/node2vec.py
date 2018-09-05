@@ -128,12 +128,14 @@ class Node2Vec:
         first_travel_done = set()
 
         for source in tqdm(self.graph.nodes(), desc='Computing transition probabilities'):
+            source_neighbors = list(self.graph[source])
+            source_neighbors_set = set(source_neighbors)
 
             # Init probabilities dict for first travel
             if self.PROBABILITIES_KEY not in d_graph[source]:
                 d_graph[source][self.PROBABILITIES_KEY] = dict()
 
-            for current_node in self.graph.neighbors(source):
+            for current_node in source_neighbors:
 
                 # Init probabilities dict
                 if self.PROBABILITIES_KEY not in d_graph[current_node]:
@@ -152,14 +154,15 @@ class Node2Vec:
                 first_travel_weights = list()
                 d_neighbors = list()
 
+                current_neighbors = self.graph[current_node]
                 # Calculate unnormalized weights
-                for destination in self.graph.neighbors(current_node):
+                for destination in current_neighbors:
                     if destination == source:  # Backwards probability
-                        ss_weight = self.graph[current_node][destination].get(self.weight_key, 1) * 1 / p
-                    elif destination in self.graph[source]:  # If the neighbor is connected to the source
-                        ss_weight = self.graph[current_node][destination].get(self.weight_key, 1)
+                        ss_weight = current_neighbors[destination].get(self.weight_key, 1) * 1 / p
+                    elif destination in source_neighbors_set:  # If the neighbor is connected to the source
+                        ss_weight = current_neighbors[destination].get(self.weight_key, 1)
                     else:
-                        ss_weight = self.graph[current_node][destination].get(self.weight_key, 1) * 1 / q
+                        ss_weight = current_neighbors[destination].get(self.weight_key, 1) * 1 / q
 
                     # Assign the unnormalized sampling strategy weight, normalize during random walk
                     unnormalized_weights.append(ss_weight)
