@@ -130,3 +130,43 @@ def test_weighted_probabilities():
         (1, 3): n([RET * w13, TRI * w23]),
         (2, 3): n([TRI * w13, RET * w23])
     })
+
+def test_digraph():
+    # 0 -> 1 <-> 2 -> 3
+    graph = nx.DiGraph()
+    graph.add_edges_from([
+        (0, 1),
+        (1, 2),
+        (2, 1),
+        (2, 3)
+    ])
+    n2v = Node2Vec(graph, dimensions=1, walk_length=1, num_walks=1, p=1/RET, q=1/EXP)
+    assert n2v.neighbors == {
+        0: [1],
+        1: [2],
+        2: [1, 3],
+        3: [],
+    }
+
+    assert_probabilities_equal(n2v.probabilities, {
+        # the first-travel probabilities
+        0: n([1]),
+        1: n([1]),
+        2: n([1, 1]),
+        # 3: nowhere to go
+
+        # the two-hop biased probabilities
+
+        # current == 0
+        # no way to get here
+
+        # current == 1
+        (0, 1): n([EXP]),
+        (2, 1): n([RET]),
+
+        # current == 2
+        (1, 2): n([RET, EXP]),
+
+        # current == 3
+        # nowhere to go
+    })

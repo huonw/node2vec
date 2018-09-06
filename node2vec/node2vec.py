@@ -118,8 +118,11 @@ def parallel_precompute_probabilities(nodes, graph, sampling_strategy, global_p,
                 # Assign the unnormalized sampling strategy weight, normalize during random walk
                 unnormalized_weights.append(ss_weight)
 
-            probabilities[(source, current_node)] = Categorical(unnormalized_weights)
-        probabilities[source] = Categorical(first_travel_weights)
+            if unnormalized_weights:
+                probabilities[(source, current_node)] = Categorical(unnormalized_weights)
+
+        if first_travel_weights:
+            probabilities[source] = Categorical(first_travel_weights)
 
     return probabilities, neighbors
 
