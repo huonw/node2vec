@@ -2,9 +2,9 @@ import random
 from collections import defaultdict
 import numpy as np
 import gensim
+from .categorical import Categorical
 from joblib import Parallel, delayed
 from tqdm import tqdm
-
 
 def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_walks, cpu_num, sampling_strategy=None,
                             num_walks_key=None, walk_length_key=None):
@@ -12,7 +12,6 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
     Generates the random walks which will be used as the skip-gram input.
     :return: List of walks. Each walk is a list of nodes.
     """
-
     walks = list()
     with tqdm(total=num_walks * len(neighbors)) as pbar:
         pbar.set_description('Generating walks (CPU: {})'.format(cpu_num))
@@ -54,11 +53,11 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
 
                     if len(walk) == 1:  # For the first step
                         p = probabilities[previous]
-                        walk_to = np.random.choice(walk_options, size=1, p=p)[0]
                     else:
                         p = probabilities[(walk[-2], previous)]
-                        walk_to = np.random.choice(walk_options, size=1, p=p)[0]
 
+                    idx = p.sample()
+                    walk_to = walk_options[idx]
                     walk.append(walk_to)
 
                 walk = list(map(str, walk))  # Convert all to strings
@@ -119,12 +118,9 @@ def parallel_precompute_probabilities(nodes, graph, sampling_strategy, global_p,
                 # Assign the unnormalized sampling strategy weight, normalize during random walk
                 unnormalized_weights.append(ss_weight)
 
-            # Normalize
-            unnormalized_weights = np.array(unnormalized_weights)
-            probabilities[(source, current_node)] = unnormalized_weights / unnormalized_weights.sum()
+            probabilities[(source, current_node)] = Categorical(unnormalized_weights)
+        probabilities[source] = Categorical(first_travel_weights)
 
-        unnormalized_weights = np.array(first_travel_weights)
-        probabilities[source] = unnormalized_weights / unnormalized_weights.sum()
     return probabilities, neighbors
 
 class Node2Vec:

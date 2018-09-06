@@ -10,7 +10,7 @@ def assert_probabilities_equal(computed, expected):
     expected."""
     assert computed.keys() == expected.keys()
     for k in expected:
-        np.testing.assert_almost_equal(computed[k], expected[k],
+        np.testing.assert_almost_equal(computed[k].pmf(), expected[k],
                                        err_msg='mismatched probabilities for %s' % (k,))
 
 def n(array):
