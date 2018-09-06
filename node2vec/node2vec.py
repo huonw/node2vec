@@ -13,52 +13,47 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, global
     :return: List of walks. Each walk is a list of nodes.
     """
     walks = list()
-    with tqdm(total=global_num_walks * len(neighbors)) as pbar:
-        pbar.set_description('Generating walks (CPU: {})'.format(cpu_num))
+    # Start the random walks from every node
+    for source in tqdm(neighbors.keys(), desc='Generating walks (CPU: {})'.format(cpu_num)):
+        # Calculate the number of walks, and how long, if there's a
+        # specific strategy for this one.
+        try:
+            source_strategy = sampling_strategy[source]
+        except KeyError:
+            num_walks = global_num_walks
+            walk_length = global_walk_length
+        else:
+            num_walks = source_strategy.get(num_walks_key, global_num_walks)
+            walk_length = source_strategy.get(walk_length_key, global_walk_length)
 
-        # Start the random walks from every node
-        for source in neighbors.keys():
-            # Calculate the number of walks, and how long, if there's a
-            # specific strategy for this one.
-            try:
-                source_strategy = sampling_strategy[source]
-            except KeyError:
-                num_walks = global_num_walks
-                walk_length = global_walk_length
-            else:
-                num_walks = source_strategy.get(num_walks_key, global_num_walks)
-                walk_length = source_strategy.get(walk_length_key, global_walk_length)
+        # Generate all the randomness we need up front, in one big
+        # splat, for efficiency.
+        rands = np.random.random((num_walks, walk_length - 1, 2))
+        for walk_rands in rands:
+            walk = [source]
+            # Perform walk by stepping with each of those pairs of random
+            # numbers
+            for step_rands in walk_rands:
+                previous = walk[-1]
 
-            # Generate all the randomness we need up front, in one big
-            # splat, for efficiency.
-            rands = np.random.random((num_walks, walk_length - 1, 2))
-            for walk_rands in rands:
-                pbar.update(1)
+                walk_options = neighbors[previous]
 
-                walk = [source]
-                # Perform walk by stepping with each of those pairs of random
-                # numbers
-                for step_rands in walk_rands:
-                    previous = walk[-1]
+                # Skip dead end nodes
+                if not walk_options:
+                    break
 
-                    walk_options = neighbors[previous]
+                if len(walk) == 1:  # For the first step
+                    p = probabilities[previous]
+                else:
+                    p = probabilities[(walk[-2], previous)]
 
-                    # Skip dead end nodes
-                    if not walk_options:
-                        break
+                idx = p.sample_with(step_rands[0], step_rands[1])
+                walk_to = walk_options[idx]
+                walk.append(walk_to)
 
-                    if len(walk) == 1:  # For the first step
-                        p = probabilities[previous]
-                    else:
-                        p = probabilities[(walk[-2], previous)]
+            walk = list(map(str, walk))  # Convert all to strings
 
-                    idx = p.sample_with(step_rands[0], step_rands[1])
-                    walk_to = walk_options[idx]
-                    walk.append(walk_to)
-
-                walk = list(map(str, walk))  # Convert all to strings
-
-                walks.append(walk)
+            walks.append(walk)
 
     return walks
 
