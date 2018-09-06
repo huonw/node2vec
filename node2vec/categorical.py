@@ -86,6 +86,14 @@ class Categorical(object):
         pmf /= len(pmf)
         return pmf
 
+    def sample_with(self, k_variate, u_variate):
+        k = int(k_variate * len(self.weights))
+        u = self.weights[k]
+        if u_variate < u:
+            return k
+        else:
+            return self.reassigns[k]
+
     def sample(self):
         # Draw from the overall uniform mixture.
         k = np.random.choice(len(self.weights))

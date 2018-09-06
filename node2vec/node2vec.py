@@ -41,8 +41,12 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
                 else:
                     walk_length = global_walk_length
 
-                # Perform walk
-                while len(walk) < walk_length:
+                # Generate all the randomness we need up front, in one big
+                # splat, for efficiency.
+                rands = np.random.random((walk_length - 1, 2))
+                # Perform walk by stepping with each of those pairs of random
+                # numbers
+                for step_rands in rands:
                     previous = walk[-1]
 
                     walk_options = neighbors[previous]
@@ -56,7 +60,7 @@ def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_wa
                     else:
                         p = probabilities[(walk[-2], previous)]
 
-                    idx = p.sample()
+                    idx = p.sample_with(step_rands[0], step_rands[1])
                     walk_to = walk_options[idx]
                     walk.append(walk_to)
 

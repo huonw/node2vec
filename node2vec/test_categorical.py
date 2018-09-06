@@ -9,6 +9,11 @@ def check_pmf(c, expected):
     np.testing.assert_almost_equal(observed / observed.sum(), expected,
                                    decimal=2)
 
+    variates = np.random.random((N, 2))
+    observed = np.bincount([c.sample_with(a, b) for a, b in variates])
+    np.testing.assert_almost_equal(observed / observed.sum(), expected,
+                                   decimal=2)
+
 def test_uniform1():
     c = Categorical([1234])
     np.testing.assert_almost_equal(c.weights, [1])
