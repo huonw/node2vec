@@ -6,47 +6,39 @@ from .categorical import Categorical
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-def parallel_generate_walks(probabilities, neighbors, global_walk_length, num_walks, cpu_num, sampling_strategy=None,
+def parallel_generate_walks(probabilities, neighbors, global_walk_length, global_num_walks, cpu_num, sampling_strategy=None,
                             num_walks_key=None, walk_length_key=None):
     """
     Generates the random walks which will be used as the skip-gram input.
     :return: List of walks. Each walk is a list of nodes.
     """
     walks = list()
-    with tqdm(total=num_walks * len(neighbors)) as pbar:
+    with tqdm(total=global_num_walks * len(neighbors)) as pbar:
         pbar.set_description('Generating walks (CPU: {})'.format(cpu_num))
 
-        for n_walk in range(num_walks):
+        # Start the random walks from every node
+        for source in neighbors.keys():
+            # Calculate the number of walks, and how long, if there's a
+            # specific strategy for this one.
+            try:
+                source_strategy = sampling_strategy[source]
+            except KeyError:
+                num_walks = global_num_walks
+                walk_length = global_walk_length
+            else:
+                num_walks = source_strategy.get(num_walks_key, global_num_walks)
+                walk_length = source_strategy.get(walk_length_key, global_walk_length)
 
-            # Shuffle the nodes
-            shuffled_nodes = list(neighbors.keys())
-            random.shuffle(shuffled_nodes)
-
-            # Start a random walk from every node
-            for source in shuffled_nodes:
+            # Generate all the randomness we need up front, in one big
+            # splat, for efficiency.
+            rands = np.random.random((num_walks, walk_length - 1, 2))
+            for walk_rands in rands:
                 pbar.update(1)
 
-                # Skip nodes with specific num_walks
-                if source in sampling_strategy and \
-                        num_walks_key in sampling_strategy[source] and \
-                        sampling_strategy[source][num_walks_key] <= n_walk:
-                    continue
-
-                # Start walk
                 walk = [source]
-
-                # Calculate walk length
-                if source in sampling_strategy:
-                    walk_length = sampling_strategy[source].get(walk_length_key, global_walk_length)
-                else:
-                    walk_length = global_walk_length
-
-                # Generate all the randomness we need up front, in one big
-                # splat, for efficiency.
-                rands = np.random.random((walk_length - 1, 2))
                 # Perform walk by stepping with each of those pairs of random
                 # numbers
-                for step_rands in rands:
+                for step_rands in walk_rands:
                     previous = walk[-1]
 
                     walk_options = neighbors[previous]
