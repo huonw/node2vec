@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "node2vec"
+version = "0.1.2"
+description = "Implementation of the node2vec algorithm."
+authors = ["Elior Cohen"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+networkx = "^2.1"
+gensim = "^3.5"
+numpy = "^1.5"
+tqdm = "^4.25"
+joblib = "^0.12.3"
+
+[tool.poetry.dev-dependencies]
+line_profiler = "^2.1"
+pytest = "*"
