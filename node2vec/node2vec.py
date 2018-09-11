@@ -125,7 +125,7 @@ class Node2Vec:
     Q_KEY = 'q'
 
     def __init__(self, graph, dimensions=128, walk_length=80, num_walks=10, p=1, q=1, weight_key='weight',
-                 workers=1, sampling_strategy=None):
+                 workers=1, probability_workers=None, sampling_strategy=None):
         """
         Initiates the Node2Vec object, precomputes walking probabilities and generates the walks.
         :param graph: Input graph
@@ -155,6 +155,7 @@ class Node2Vec:
         self.q = q
         self.weight_key = weight_key
         self.workers = workers
+        self.probability_workers = workers if probability_workers is None else probability_workers
 
         if sampling_strategy is None:
             self.sampling_strategy = {}
@@ -169,13 +170,14 @@ class Node2Vec:
         Precomputes transition probabilities for each node.
         """
 
-        node_lists = np.array_split(list(self.graph.nodes), self.workers)
+        node_lists = np.array_split(list(self.graph.nodes), self.probability_workers)
 
-        results = Parallel(n_jobs=self.workers)(delayed(parallel_precompute_probabilities)(nodes, self.graph,
-                                                                                           self.sampling_strategy, self.p, self.q,
-                                                                                           idx,
-                                                                                           self.WEIGHT_KEY, self.P_KEY, self.Q_KEY)
-                                                for idx, nodes in enumerate(node_lists, 1))
+        parallel = Parallel(n_jobs=self.probability_workers)
+        results = parallel(delayed(parallel_precompute_probabilities)(nodes, self.graph,
+                                                                      self.sampling_strategy, self.p, self.q,
+                                                                      idx,
+                                                                      self.WEIGHT_KEY, self.P_KEY, self.Q_KEY)
+                           for idx, nodes in enumerate(node_lists, 1))
 
         probabilities = {}
         neighbors = {}
