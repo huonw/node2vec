@@ -1,0 +1,21 @@
+[package]
+name = "node2vec"
+version = "0.1.0"
+authors = ["Huon Wilson <Huon.Wilson@data61.csiro.au>"]
+build = "build.rs"
+
+[lib]
+name = "node2vec"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+quick-error = "1.2.2"
+petgraph = "0.4.13"
+vosealias = "0.2.0"
+rand = "0.3"
+
+[build-dependencies]
+cbindgen = "0.6.3"

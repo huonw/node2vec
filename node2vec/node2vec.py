@@ -6,6 +6,8 @@ from .categorical import Categorical
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+from node2vec._native import ffi, lib
+
 def parallel_generate_walks(probabilities, neighbors, global_walk_length, global_num_walks, cpu_num, sampling_strategy=None,
                             num_walks_key=None, walk_length_key=None):
     """
