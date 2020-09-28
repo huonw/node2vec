@@ -16,6 +16,14 @@ Adopted and adjusted from: https://github.com/enewe101/categorical
 import numpy.random as r
 import numpy as np
 
+WEIGHT_DTYPE = np.float32
+def reassign_dtype(length):
+    if length < 2**8:
+        return np.uint8
+    elif length < 2**16:
+        return np.uint16
+    else:
+        return np.uint32
 
 class Categorical(object):
 
@@ -24,9 +32,9 @@ class Categorical(object):
             raise ValueError('The scores list must have length >= 1')
 
         k = len(scores)
-        weights = np.array(scores, dtype=np.float64)
+        weights = np.array(scores, dtype=WEIGHT_DTYPE)
         weights *= k / weights.sum()
-        reassigns = np.arange(k, dtype=np.int32)
+        reassigns = np.arange(k, dtype=reassign_dtype(k))
 
         # Sort the data into the outcomes with probabilities
         # that are larger and smaller than 1/K.
@@ -107,3 +115,10 @@ class Categorical(object):
             return int(k)
         else:
             return int(self.reassigns[k])
+
+    def __getstate__(self):
+        return (self.weights.tobytes(), self.reassigns.tobytes())
+    def __setstate__(self, x):
+        w, r = x
+        self.weights = np.frombuffer(w, dtype=WEIGHT_DTYPE)
+        self.reassigns = np.frombuffer(r, dtype=reassign_dtype(len(self.weights)))
